@@ -159,7 +159,7 @@ Connection.prototype.authenticate = function(opts, callback) {
           body = JSON.parse(body);
         }
         catch (e) {
-          body = null;
+          return callback(new NForceError.ApiCallFailure(util.format('Salesforce returned unparsable JSON body. Error = %s.\nRaw response: %s.', e.toString(), body)));
         }
       }
       if (res.statusCode == 200) {
@@ -219,7 +219,7 @@ Connection.prototype.refreshToken = function(oauth, callback) {
           body = JSON.parse(body);
         }
         catch (e) {
-          body = null;
+          return callback(new NForceError.ApiCallFailure(util.format('Salesforce returned unparsable JSON body. Error = %s.\nRaw response: %s.', e.toString(), body)));
         }
       }
       if (res.statusCode == 200) {
@@ -1050,7 +1050,7 @@ var apiBlobRequest = function(opts, oauth, callback) {
         body = JSON.parse(body);
       }
       catch (e) {
-        body = null;
+        return callback(new NForceError.ApiCallFailure(util.format('Salesforce returned unparsable JSON body. Error = %s.\nRaw response: %s.', e.toString(), body)));
       }
     }
 
@@ -1101,7 +1101,7 @@ var apiRequest = function(opts, oauth, sobject, callback) {
         body = JSON.parse(body);
       }
       catch (e) {
-        body = null;
+        return callback(new NForceError.ApiCallFailure(util.format('Salesforce returned unparsable JSON body. Error = %s.\nRaw response: %s.', e.toString(), body)));
       }
     }
 
