@@ -162,14 +162,15 @@ Connection.prototype.authenticate = function(opts, callback) {
           return callback(new NForceError.ApiCallFailure(util.format('Salesforce returned unparsable JSON body. Error = %s.\nRaw response: %s.', e.toString(), body)));
         }
       }
-      if (res.statusCode == 200) {
+      var statusCode = res ? res.statusCode : 500;
+      if (statusCode == 200) {
         if(self.mode === 'single') self.oauth = body;
         callback(null, body);
       }
       else {
         var message = body ? body.error_description : '';
         var errorCode = body ? body.error : '';
-        callback(new NForceError.ApiCallFailure(message, errorCode, res.statusCode));
+        callback(new NForceError.ApiCallFailure(message, errorCode, statusCode));
       }
     } else {
       callback(err, null);
@@ -222,14 +223,15 @@ Connection.prototype.refreshToken = function(oauth, callback) {
           return callback(new NForceError.ApiCallFailure(util.format('Salesforce returned unparsable JSON body. Error = %s.\nRaw response: %s.', e.toString(), body)));
         }
       }
-      if (res.statusCode == 200) {
+      var statusCode = res ? res.statusCode : 500;
+      if (statusCode == 200) {
         if(self.mode === 'single') self.oauth = body;
         callback(null, body);
       }
       else {
         var message = body ? body.error_description : '';
         var errorCode = body ? body.error : '';
-        callback(new NForceError.ApiCallFailure(message, errorCode, res.statusCode));
+        callback(new NForceError.ApiCallFailure(message, errorCode, statusCode));
       }
     } else {
       callback(err, null);
@@ -262,7 +264,7 @@ Connection.prototype.getVersions = function(callback) {
   if(!callback) callback = function(){}
   
   return request('http://na1.salesforce.com/services/data/', function(err, res, body){
-    if(!err && res.statusCode == 200) {
+    if(!err && res && res.statusCode == 200) {
       callback(null, JSON.parse(body));
     } else {
       callback(err, null);
@@ -1041,7 +1043,7 @@ var apiBlobRequest = function(opts, oauth, callback) {
     if(err) return callback(err, null);
 
     // salesforce returned no body but an error in the header
-    if(!body && res.headers && res.headers.error) {
+    if(!body && res && res.headers && res.headers.error) {
       return callback(new NForceError.ApiCallFailure(res.headers.error), null);
     }
 
@@ -1054,8 +1056,10 @@ var apiBlobRequest = function(opts, oauth, callback) {
       }
     }
 
+    var statusCode = res ? res.statusCode : 500;
+
     // salesforce returned an ok of some sort
-    if(res.statusCode >= 200 && res.statusCode <= 204) {
+    if(statusCode >= 200 && statusCode <= 204) {
       return callback(null, body);
     } 
 
@@ -1063,13 +1067,13 @@ var apiBlobRequest = function(opts, oauth, callback) {
     if(body && body.length > 0) {
       var message = body[0].message || '';
       var errorCode = body[0].errorCode || '';
-      err = new NForceError.ApiCallFailure(message, errorCode, res.statusCode);
+      err = new NForceError.ApiCallFailure(message, errorCode, statusCode);
       err.messageBody = body[0].message || '';
       return callback(err, null);
     } 
 
     // we don't know what happened
-    return callback(new NForceError.ApiCallFailure('Salesforce returned no body and status code.', null, res.statusCode));
+    return callback(new NForceError.ApiCallFailure('Salesforce returned no body and status code.', null, statusCode));
 
   });
 }
@@ -1092,7 +1096,7 @@ var apiRequest = function(opts, oauth, sobject, callback) {
     if(err) return callback(err, null);
 
     // salesforce returned no body but an error in the header
-    if(!body && res.headers && res.headers.error) {
+    if(!body && res && res.headers && res.headers.error) {
       return callback(new NForceError.ApiCallFailure(res.headers.error), null);
     }
 
@@ -1105,8 +1109,10 @@ var apiRequest = function(opts, oauth, sobject, callback) {
       }
     }
 
+    var statusCode = res ? res.statusCode : 500;
+
     // salesforce returned an ok of some sort
-    if(res.statusCode >= 200 && res.statusCode <= 204) {
+    if(statusCode >= 200 && statusCode <= 204) {
       // attach the id back to the sobject on insert
       if(sobject && body && body.id && !sobject.Id && !sobject.id && !sobject.ID) sobject.Id = body.id;
       return callback(null, body);
@@ -1116,13 +1122,13 @@ var apiRequest = function(opts, oauth, sobject, callback) {
     if(body && body.length > 0) {
       var message = body[0].message || '';
       var errorCode = body[0].errorCode || '';
-      err = new NForceError.ApiCallFailure(message, errorCode, res.statusCode);
+      err = new NForceError.ApiCallFailure(message, errorCode, statusCode);
       err.messageBody = body[0].message || '';
       return callback(err, null);
     } 
     
     // we don't know what happened
-    return callback(new NForceError.ApiCallFailure('Salesforce returned no body and status code.', null, res.statusCode));
+    return callback(new NForceError.ApiCallFailure('Salesforce returned no body and status code.', null, statusCode));
 
   });
 }
