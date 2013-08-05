@@ -3,6 +3,7 @@
 var request     = require('request');
 var qs          = require('querystring');
 var url         = require('url');
+var util        = require('util');
 var Record      = require('./lib/record');
 var QueryStream = require('./lib/querystream');
 var FDCStream   = require('./lib/fdcstream');
@@ -152,31 +153,14 @@ Connection.prototype.authenticate = function(opts, callback) {
     }
   }
 
-  return request(reqOpts, function(err, res, body){
-    if(!err) {
-      if(body) {
-        try {
-          body = JSON.parse(body);
-        }
-        catch (e) {
-          return callback(new NForceError.ApiCallFailure(util.format('Salesforce returned unparsable JSON body. Error = %s.\nRaw response: %s.', e.toString(), body)));
-        }
-      }
-      var statusCode = res ? res.statusCode : 500;
-      if (statusCode == 200) {
-        if(self.mode === 'single') self.oauth = body;
-        callback(null, body);
-      }
-      else {
-        var message = body ? body.error_description : '';
-        var errorCode = body ? body.error : '';
-        callback(new NForceError.ApiCallFailure(message, errorCode, statusCode));
-      }
-    } else {
-      callback(err, null);
+  var expectedStatusCode = 200;
+  return guardedRequest(reqOpts, expectedStatusCode, function(err, body) {
+    if (err) {
+      return callback(err);
     }
+    if(self.mode === 'single') self.oauth = body;
+    callback(null, body);
   });
-
 }
 
 Connection.prototype.refreshToken = function(oauth, callback) {
@@ -213,29 +197,13 @@ Connection.prototype.refreshToken = function(oauth, callback) {
     }
   }
 
-  return request(reqOpts, function(err, res, body){
-    if(!err) {
-      if(body) {
-        try {
-          body = JSON.parse(body);
-        }
-        catch (e) {
-          return callback(new NForceError.ApiCallFailure(util.format('Salesforce returned unparsable JSON body. Error = %s.\nRaw response: %s.', e.toString(), body)));
-        }
-      }
-      var statusCode = res ? res.statusCode : 500;
-      if (statusCode == 200) {
-        if(self.mode === 'single') self.oauth = body;
-        callback(null, body);
-      }
-      else {
-        var message = body ? body.error_description : '';
-        var errorCode = body ? body.error : '';
-        callback(new NForceError.ApiCallFailure(message, errorCode, statusCode));
-      }
-    } else {
-      callback(err, null);
+  var expectedStatusCode = 200;
+  return guardedRequest(reqOpts, expectedStatusCode, function(err, body) {
+    if (err) {
+      return callback(err);
     }
+    if(self.mode === 'single') self.oauth = body;
+    callback(null, body);
   });
 
 }
@@ -263,12 +231,14 @@ Connection.prototype.getIdentity = function(oauth, callback) {
 Connection.prototype.getVersions = function(callback) {
   if(!callback) callback = function(){}
   
-  return request('http://na1.salesforce.com/services/data/', function(err, res, body){
-    if(!err && res && res.statusCode == 200) {
-      callback(null, JSON.parse(body));
-    } else {
-      callback(err, null);
+  var reqOpts = { uri: 'http://na1.salesforce.com/services/data/', method: 'GET' };
+
+  var expectedStatusCode = 200;
+  return guardedRequest(reqOpts, expectedStatusCode, function(err, body) {
+    if (err) {
+      return callback(err);
     }
+    callback(null, body);
   });
 }
 
@@ -1044,36 +1014,35 @@ var apiBlobRequest = function(opts, oauth, callback) {
 
     // salesforce returned no body but an error in the header
     if(!body && res && res.headers && res.headers.error) {
-      return callback(new NForceError.ApiCallFailure(res.headers.error), null);
+      return callback(new Error(res.headers.error), null);
     }
+
+    var statusCode = res ? res.statusCode : 500;
+    // salesforce returned an ok of some sort
+    if(statusCode >= 200 && statusCode <= 204) {
+      return callback(null, body);
+    } 
 
     if(body) {
       try {
         body = JSON.parse(body);
       }
       catch (e) {
-        return callback(new NForceError.ApiCallFailure(util.format('Salesforce returned unparsable JSON body. Error = %s.\nRaw response: %s.', e.toString(), body)));
+        return callback(new Error(util.format('Salesforce returned unparsable JSON body. Error = %s.\nRaw response: %s.', e.toString(), body)));
       }
     }
 
-    var statusCode = res ? res.statusCode : 500;
-
-    // salesforce returned an ok of some sort
-    if(statusCode >= 200 && statusCode <= 204) {
-      return callback(null, body);
-    } 
-
     // salesforce returned an error with a body
-    if(body && body.length > 0) {
-      var message = body[0].message || '';
-      var errorCode = body[0].errorCode || '';
-      err = new NForceError.ApiCallFailure(message, errorCode, statusCode);
-      err.messageBody = body[0].message || '';
+    if(Array.isArray(body) && body.length > 0) {
+      err = new Error(body[0].message);
+      err.errorCode = body[0].errorCode;
+      err.statusCode = statusCode;
+      err.messageBody = body[0].message;
       return callback(err, null);
     } 
 
     // we don't know what happened
-    return callback(new NForceError.ApiCallFailure('Salesforce returned no body and status code.', null, statusCode));
+    return callback(new Error('Salesforce returned no body and status code ' + statusCode));
 
   });
 }
@@ -1097,7 +1066,7 @@ var apiRequest = function(opts, oauth, sobject, callback) {
 
     // salesforce returned no body but an error in the header
     if(!body && res && res.headers && res.headers.error) {
-      return callback(new NForceError.ApiCallFailure(res.headers.error), null);
+      return callback(new Error(res.headers.error), null);
     }
 
     if(body) {
@@ -1105,12 +1074,11 @@ var apiRequest = function(opts, oauth, sobject, callback) {
         body = JSON.parse(body);
       }
       catch (e) {
-        return callback(new NForceError.ApiCallFailure(util.format('Salesforce returned unparsable JSON body. Error = %s.\nRaw response: %s.', e.toString(), body)));
+        return callback(new Error(util.format('Salesforce returned unparsable JSON body. Error = %s.\nRaw response: %s.', e.toString(), body)));
       }
     }
 
     var statusCode = res ? res.statusCode : 500;
-
     // salesforce returned an ok of some sort
     if(statusCode >= 200 && statusCode <= 204) {
       // attach the id back to the sobject on insert
@@ -1119,19 +1087,48 @@ var apiRequest = function(opts, oauth, sobject, callback) {
     } 
 
     // salesforce returned an error with a body
-    if(body && body.length > 0) {
-      var message = body[0].message || '';
-      var errorCode = body[0].errorCode || '';
-      err = new NForceError.ApiCallFailure(message, errorCode, statusCode);
-      err.messageBody = body[0].message || '';
+    if(Array.isArray(body) && body.length > 0) {
+      err = new Error(body[0].message);
+      err.errorCode = body[0].errorCode;
+      err.statusCode = statusCode;
+      err.messageBody = body[0].message;
       return callback(err, null);
     } 
     
     // we don't know what happened
-    return callback(new NForceError.ApiCallFailure('Salesforce returned no body and status code.', null, statusCode));
+    return callback(new Error('Salesforce returned no body and status code ' + statusCode));
 
   });
 }
+
+var guardedRequest = function(reqOpts, expectedStatusCode, callback) {
+  return request(reqOpts, function(err, res, body){
+    if (err) {
+      return callback(err);
+    }
+
+    if(body) {
+      try {
+        body = JSON.parse(body);
+      }
+      catch (e) {
+        return callback(new Error(util.format('Salesforce returned unparsable JSON body. Error = %s.\nRaw response: %s.', e.toString(), body)));
+      }
+    }
+
+    var statusCode = res ? res.statusCode : 500;
+    if(statusCode != expectedStatusCode) {
+      var message = body ? body.error_description : '';
+      var errorCode = body ? body.error : '';
+      err = new Error(errorCode + ' - ' + message);
+      err.statusCode = statusCode;
+      return callback(err);
+    }
+
+    //  success
+    callback(null, body);
+  });
+};
 
 // exports
 
