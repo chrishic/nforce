@@ -1014,7 +1014,7 @@ var apiBlobRequest = function(opts, oauth, callback) {
 
     // salesforce returned no body but an error in the header
     if(!body && res && res.headers && res.headers.error) {
-      return callback(new Error(res.headers.error), null);
+      return callback(new NForceError.ApiCallFailure(res.headers.error), null);
     }
 
     var statusCode = res ? res.statusCode : 500;
@@ -1028,21 +1028,19 @@ var apiBlobRequest = function(opts, oauth, callback) {
         body = JSON.parse(body);
       }
       catch (e) {
-        return callback(new Error(util.format('Salesforce returned unparsable JSON body. Error = %s.\nRaw response: %s.', e.toString(), body)));
+        return callback(new NForceError.ApiCallFailure(util.format('Salesforce returned unparsable JSON body. Error = %s.\nRaw response: %s.', e.toString(), body)));
       }
     }
 
     // salesforce returned an error with a body
     if(Array.isArray(body) && body.length > 0) {
-      err = new Error(body[0].message);
-      err.errorCode = body[0].errorCode;
-      err.statusCode = statusCode;
+      err = new NForceError.ApiCallFailure(body[0].message, body[0].errorCode, statusCode);
       err.messageBody = body[0].message;
-      return callback(err, null);
+      return callback(err);
     } 
 
     // we don't know what happened
-    return callback(new Error('Salesforce returned no body and status code ' + statusCode));
+    return callback(new NForceError.ApiCallFailure('Salesforce returned no body and status code', null, statusCode));
 
   });
 }
@@ -1066,7 +1064,7 @@ var apiRequest = function(opts, oauth, sobject, callback) {
 
     // salesforce returned no body but an error in the header
     if(!body && res && res.headers && res.headers.error) {
-      return callback(new Error(res.headers.error), null);
+      return callback(new NForceError.ApiCallFailure(res.headers.error), null);
     }
 
     if(body) {
@@ -1074,7 +1072,7 @@ var apiRequest = function(opts, oauth, sobject, callback) {
         body = JSON.parse(body);
       }
       catch (e) {
-        return callback(new Error(util.format('Salesforce returned unparsable JSON body. Error = %s.\nRaw response: %s.', e.toString(), body)));
+        return callback(new NForceError.ApiCallFailure(util.format('Salesforce returned unparsable JSON body. Error = %s.\nRaw response: %s.', e.toString(), body)));
       }
     }
 
@@ -1088,15 +1086,13 @@ var apiRequest = function(opts, oauth, sobject, callback) {
 
     // salesforce returned an error with a body
     if(Array.isArray(body) && body.length > 0) {
-      err = new Error(body[0].message);
-      err.errorCode = body[0].errorCode;
-      err.statusCode = statusCode;
+      err = new NForceError.ApiCallFailure(body[0].message, body[0].errorCode, statusCode);
       err.messageBody = body[0].message;
-      return callback(err, null);
+      return callback(err);
     } 
     
     // we don't know what happened
-    return callback(new Error('Salesforce returned no body and status code ' + statusCode));
+    return callback(new NForceError.ApiCallFailure('Salesforce returned no body and status code', null, statusCode));
 
   });
 }
@@ -1112,7 +1108,7 @@ var guardedRequest = function(reqOpts, expectedStatusCode, callback) {
         body = JSON.parse(body);
       }
       catch (e) {
-        return callback(new Error(util.format('Salesforce returned unparsable JSON body. Error = %s.\nRaw response: %s.', e.toString(), body)));
+        return callback(new NForceError.ApiCallFailure(util.format('Salesforce returned unparsable JSON body. Error = %s.\nRaw response: %s.', e.toString(), body)));
       }
     }
 
@@ -1120,9 +1116,7 @@ var guardedRequest = function(reqOpts, expectedStatusCode, callback) {
     if(statusCode != expectedStatusCode) {
       var message = body ? body.error_description : '';
       var errorCode = body ? body.error : '';
-      err = new Error(errorCode + ' - ' + message);
-      err.statusCode = statusCode;
-      return callback(err);
+      return callback(new NForceError.ApiCallFailure(message, errorCode, statusCode));
     }
 
     //  success
