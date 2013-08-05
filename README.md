@@ -100,6 +100,16 @@ org.query(q, oauth, function(err, resp){
 });
 ```
 
+## Using the Example Files
+
+Most of the files in the examples directory can be used by simply setting two environment variables then running the files. The two environment variables are `SFUSER` and `SFPASS` which are your Salesforce.com username and passsword, respectively. Example below:
+
+```bash 
+$ export SFUSER=myusername@salesforce.com
+$ export SFPASS=mypassword
+$ node examples/crud.js
+```
+
 ## Authentication
 
 **nforce** supports two Salesforce OAuth 2.0 flows, username/password and authorization code. 
@@ -458,9 +468,12 @@ org.apexRest({uri:'test', method: 'POST', body: body, urlParams: urlParams}, req
 * Zach McElrath -> [zachelrath](https://github.com/zachelrath)
 * Chris Bland -> [chrisbland](https://github.com/chrisbland)
 * Jeremy Neander -> [jneander](https://github.com/jneander)
+* Austin McDaniel -> [amcdaniel2](https://github.com/amcdaniel2)
+* Chris Hickman -> [chrishic](https://github.com/chrishic)
 
 ## Changelog
 
+* `v0.4.4`: Fixes query stream issues
 * `v0.4.3`: Fix express oauth issue. Whoops, my bad!
 * `v0.4.2`: Fix for upsert issue
 * `v0.4.1`: Bug fix for handling SFDC 500 response
