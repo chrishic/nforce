@@ -233,15 +233,13 @@ Connection.prototype.getIdentity = function(oauth, callback) {
 }
 
 Connection.prototype.getVersions = function(callback) {
+  var opts;
+
   if(!callback) callback = function(){}
   
-  return request('http://na1.salesforce.com/services/data/', function(err, res, body){
-    if(!err && res.statusCode == 200) {
-      callback(null, JSON.parse(body));
-    } else {
-      callback(err, null);
-    }
-  });
+  opts = { uri : 'http://na1.salesforce.com/services/data/', method: 'GET' };
+  
+  return apiAuthRequest(opts, callback);
 }
 
 Connection.prototype.getResources = function(oauth, callback) {
@@ -1040,7 +1038,8 @@ var apiAuthRequest = function(opts, callback) {
     }
 
     if(res.statusCode === 200) {
-      if(self.mode === 'single') self.oauth = body;
+      // detect oauth response for single mode
+      if(self.mode === 'single' && body.access_token) self.oauth = body;
       return callback(null, body);
     } else {
       var e = new Error(body.error + ' - ' + body.error_description);

@@ -307,7 +307,7 @@ The createConnection method creates an *nforce* salesforce connection object. Yo
 * `clientId`: Required. This is the OAuth client id
 * `clientSecret`: Required. This is the OAuth client secret
 * `redirectUri`: Required. This is the redirect URI for OAuth callbacks
-* `apiVersion`: Optional. This is a number or string representing a valid REST API version. Default is v24.0.
+* `apiVersion`: Optional. This is a number or string representing a valid REST API version. Default is the latest current api version.
 * `environment`: Optional. Values can be 'production' or 'sandbox'. Default is production.
 * `loginUri`: Optional. Used to override the login URI if needed.
 * `testLoginUri`: Optional. Used to override the testLoginUri if needed.
@@ -338,9 +338,9 @@ The following list of methods are available for an **nforce** connection object:
 
 This is a helper method to build the authentication uri for a authorization code OAuth 2.0 flow. You can optionally pass in an OAuth options argument. The supported options are:
 
-* `display`: (String) Tailors the login page to the user's device type. Currently the only values supported are `page`, `popup`, and 'touch'
+* `display`: (String) Tailors the login page to the user's device type. Currently the only values supported are `page`, `popup`, and `touch`
 * `immediate`: (Boolean) Avoid interacting with the user. Default is false.
-* `scope`: (Array) The scope parameter allows you to fine-tune what the client application can access. Supported values are `api`, `chatter_api`, `full`, `id`, `refresh_token`, `visualforce', and `web`.
+* `scope`: (Array) The scope parameter allows you to fine-tune what the client application can access. Supported values are `api`, `chatter_api`, `full`, `id`, `refresh_token`, `visualforce`, and `web` 
 * `state`: Any value that you wish to be sent with the callback
 
 ### authenticate(opts, [callback])
@@ -478,6 +478,7 @@ org.apexRest({uri:'test', method: 'POST', body: body, urlParams: urlParams}, req
 
 ## Changelog
 
+* `v0.5.1`: Fix a bug in getVersions for single user mode
 * `v0.5.0`: Safer error handling. OAuth extra param support.
 * `v0.4.4`: Fixes query stream issues
 * `v0.4.3`: Fix express oauth issue. Whoops, my bad!
