@@ -17,7 +17,7 @@ var AUTH_ENDPOINT      = 'https://login.salesforce.com/services/oauth2/authorize
 var TEST_AUTH_ENDPOINT = 'https://test.salesforce.com/services/oauth2/authorize';
 var LOGIN_URI          = 'https://login.salesforce.com/services/oauth2/token';
 var TEST_LOGIN_URI     = 'https://test.salesforce.com/services/oauth2/token';
-var API_VERSIONS       = ['v20.0', 'v21.0', 'v22.0', 'v23.0', 'v24.0', 'v25.0', 'v26.0', 'v27.0'];
+var API_VERSIONS       = ['v20.0', 'v21.0', 'v22.0', 'v23.0', 'v24.0', 'v25.0', 'v26.0', 'v27.0', 'v28.0'];
 
 // nforce connection object
 
@@ -96,21 +96,40 @@ var Connection = function(opts) {
 
 // oauth methods
 
-Connection.prototype.getAuthUri = function() {
-  var opts;
+Connection.prototype.getAuthUri = function(opts) {
+  if(!opts) opts = {};
+  var urlOpts;
   var self = this;
   
-  opts = {
+  urlOpts = {
     'response_type': 'code',
     'client_id': self.clientId,
     'client_secret': self.clientSecret,
     'redirect_uri': self.redirectUri
   }
 
+  if(opts.display) {
+    urlOpts.display = opts.display.toLowerCase();
+  }
+
+  if(opts.immediate) {
+    urlOpts.immediate = opts.immediate;
+  }
+
+  if(opts.scope) {
+    if(typeof opts.scope === 'object') {
+      urlOpts.scope = opts.scope.join(' ');
+    }
+  }
+
+  if(opts.state) {
+    urlOpts.state = opts.state;
+  }
+
   if(self.environment == 'sandbox') {
-    return TEST_AUTH_ENDPOINT + '?' + qs.stringify(opts);
+    return TEST_AUTH_ENDPOINT + '?' + qs.stringify(urlOpts);
   } else {
-    return AUTH_ENDPOINT + '?' + qs.stringify(opts);
+    return AUTH_ENDPOINT + '?' + qs.stringify(urlOpts);
   }
 }
 
@@ -152,15 +171,8 @@ Connection.prototype.authenticate = function(opts, callback) {
       'Content-Type': 'application/x-www-form-urlencoded'
     }
   }
-
-  var expectedStatusCode = 200;
-  return guardedRequest(reqOpts, expectedStatusCode, function(err, body) {
-    if (err) {
-      return callback(err);
-    }
-    if(self.mode === 'single') self.oauth = body;
-    callback(null, body);
-  });
+  
+  return apiAuthRequest(reqOpts, callback);
 }
 
 Connection.prototype.refreshToken = function(oauth, callback) {
@@ -197,15 +209,7 @@ Connection.prototype.refreshToken = function(oauth, callback) {
     }
   }
 
-  var expectedStatusCode = 200;
-  return guardedRequest(reqOpts, expectedStatusCode, function(err, body) {
-    if (err) {
-      return callback(err);
-    }
-    if(self.mode === 'single') self.oauth = body;
-    callback(null, body);
-  });
-
+  return apiAuthRequest(reqOpts, callback);
 }
 
 // api methods
@@ -231,14 +235,12 @@ Connection.prototype.getIdentity = function(oauth, callback) {
 Connection.prototype.getVersions = function(callback) {
   if(!callback) callback = function(){}
   
-  var reqOpts = { uri: 'http://na1.salesforce.com/services/data/', method: 'GET' };
-
-  var expectedStatusCode = 200;
-  return guardedRequest(reqOpts, expectedStatusCode, function(err, body) {
-    if (err) {
-      return callback(err);
+  return request('http://na1.salesforce.com/services/data/', function(err, res, body){
+    if(!err && res.statusCode == 200) {
+      callback(null, JSON.parse(body));
+    } else {
+      callback(err, null);
     }
-    callback(null, body);
   });
 }
 
@@ -1001,6 +1003,54 @@ var findId = function(data) {
   }
 }
 
+var isJsonResponse = function(res) {
+  return res.headers && res.headers['content-type'] 
+    && res.headers['content-type'].split(';')[0].toLowerCase() === 'application/json';
+}
+
+var errors = {
+  nonJsonResponse: function() {
+    return new Error('Non-JSON response from Salesforce');
+  },
+  invalidJson: function() {
+    return new Error('Invalid JSON response from Salesforce');
+  },
+  emptyResponse: function() {
+    return new Error('Unexpected empty response');
+  }
+}
+
+var apiAuthRequest = function(opts, callback) {
+  var self = this;
+  return request(opts, function(err, res, body){
+    // request returned an error
+    if(err) return callback(err);
+
+    // request didn't return a response. sumptin bad happened
+    if(!res) return callback(errors.emptyResponse());
+
+    if(body && isJsonResponse(res)) {
+      try {
+        body = JSON.parse(body);
+      } catch (e) {
+        return callback(errors.invalidJson());
+      }
+    } else {
+      return callback(errors.nonJsonResponse());
+    }
+
+    if(res.statusCode === 200) {
+      if(self.mode === 'single') self.oauth = body;
+      return callback(null, body);
+    } else {
+      var e = new Error(body.error + ' - ' + body.error_description);
+      e.statusCode = res.statusCode;
+      return callback(e, null);
+    }
+
+  });
+}
+
 var apiBlobRequest = function(opts, oauth, callback) {
 
   opts.headers = {
@@ -1012,35 +1062,37 @@ var apiBlobRequest = function(opts, oauth, callback) {
     // request returned an error
     if(err) return callback(err, null);
 
+    // request didn't return a response. sumptin bad happened
+    if(!res) return callback(errors.emptyResponse());
+
     // salesforce returned no body but an error in the header
-    if(!body && res && res.headers && res.headers.error) {
-      return callback(new NForceError.ApiCallFailure(res.headers.error), null);
+    if(!body && res.headers && res.headers.error) {
+      return callback(new Error(res.headers.error), null);
     }
 
-    var statusCode = res ? res.statusCode : 500;
     // salesforce returned an ok of some sort
-    if(statusCode >= 200 && statusCode <= 204) {
+    if(res.statusCode >= 200 && res.statusCode <= 204) {
       return callback(null, body);
     } 
 
-    if(body) {
-      try {
-        body = JSON.parse(body);
-      }
-      catch (e) {
-        return callback(new NForceError.ApiCallFailure(util.format('Salesforce returned unparsable JSON body. Error = %s.\nRaw response: %s.', e.toString(), body)));
-      }
-    }
-
     // salesforce returned an error with a body
-    if(Array.isArray(body) && body.length > 0) {
-      err = new NForceError.ApiCallFailure(body[0].message, body[0].errorCode, statusCode);
-      err.messageBody = body[0].message;
-      return callback(err);
+    if(body) {
+      if(isJsonResponse(res)) {
+        try {
+          body = JSON.parse(body);
+        } catch (e) {
+          return callback(errors.invalidJson());
+        }
+        err = new Error(body[0].message);
+        err.errorCode = body[0].errorCode;
+        err.statusCode = res.statusCode;
+        err.messageBody = body[0].message;
+        return callback(err, null);
+      } 
     } 
-
+    
     // we don't know what happened
-    return callback(new NForceError.ApiCallFailure('Salesforce returned no body and status code', null, statusCode));
+    return callback(new Error('Salesforce returned no body and status code ' + res.statusCode));
 
   });
 }
@@ -1048,7 +1100,8 @@ var apiBlobRequest = function(opts, oauth, callback) {
 var apiRequest = function(opts, oauth, sobject, callback) {
 
   opts.headers = {
-    'Authorization': 'Bearer ' + oauth.access_token
+    'Authorization': 'Bearer ' + oauth.access_token,
+    'Accept': 'application/json;charset=UTF-8'
   }
 
   if(opts.multipart) {
@@ -1062,67 +1115,46 @@ var apiRequest = function(opts, oauth, sobject, callback) {
     // request returned an error
     if(err) return callback(err, null);
 
+    // request didn't return a response. Sumptin bad happened
+    if(!res) return callback(errors.emptyResponse());
+
     // salesforce returned no body but an error in the header
-    if(!body && res && res.headers && res.headers.error) {
-      return callback(new NForceError.ApiCallFailure(res.headers.error), null);
+    if(!body && res.headers && res.headers.error) {
+      return callback(new Error(res.headers.error), null);
     }
 
-    if(body) {
-      try {
-        body = JSON.parse(body);
+    // attempt to parse the json now
+    if(isJsonResponse(res)) {
+      if(body) {
+        try {
+          body = JSON.parse(body);
+        } catch (e) {
+          return callback(errors.invalidJson());
+        }
       }
-      catch (e) {
-        return callback(new NForceError.ApiCallFailure(util.format('Salesforce returned unparsable JSON body. Error = %s.\nRaw response: %s.', e.toString(), body)));
-      }
-    }
+    } 
 
-    var statusCode = res ? res.statusCode : 500;
     // salesforce returned an ok of some sort
-    if(statusCode >= 200 && statusCode <= 204) {
+    if(res.statusCode >= 200 && res.statusCode <= 204) {
       // attach the id back to the sobject on insert
       if(sobject && body && body.id && !sobject.Id && !sobject.id && !sobject.ID) sobject.Id = body.id;
       return callback(null, body);
     } 
 
     // salesforce returned an error with a body
-    if(Array.isArray(body) && body.length > 0) {
-      err = new NForceError.ApiCallFailure(body[0].message, body[0].errorCode, statusCode);
-      err.messageBody = body[0].message;
-      return callback(err);
+    if(body) {
+      var e = new Error(body[0].message)
+      e.errorCode = body[0].errorCode;
+      e.statusCode = res.statusCode;
+      e.messageBody = body[0].message;
+      return callback(e, null);
     } 
     
     // we don't know what happened
-    return callback(new NForceError.ApiCallFailure('Salesforce returned no body and status code', null, statusCode));
+    return callback(new Error('Salesforce returned no body and status code ' + res.statusCode));
 
   });
 }
-
-var guardedRequest = function(reqOpts, expectedStatusCode, callback) {
-  return request(reqOpts, function(err, res, body){
-    if (err) {
-      return callback(err);
-    }
-
-    if(body) {
-      try {
-        body = JSON.parse(body);
-      }
-      catch (e) {
-        return callback(new NForceError.ApiCallFailure(util.format('Salesforce returned unparsable JSON body. Error = %s.\nRaw response: %s.', e.toString(), body)));
-      }
-    }
-
-    var statusCode = res ? res.statusCode : 500;
-    if(statusCode != expectedStatusCode) {
-      var message = body ? body.error_description : '';
-      var errorCode = body ? body.error : '';
-      return callback(new NForceError.ApiCallFailure(message, errorCode, statusCode));
-    }
-
-    //  success
-    callback(null, body);
-  });
-};
 
 // exports
 
