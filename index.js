@@ -3,11 +3,9 @@
 var request     = require('request');
 var qs          = require('querystring');
 var url         = require('url');
-var util        = require('util');
 var Record      = require('./lib/record');
 var QueryStream = require('./lib/querystream');
 var FDCStream   = require('./lib/fdcstream');
-var NForceError = require('./lib/error');
 var faye        = require('faye');
 var mime        = require('mime');
 
@@ -173,6 +171,7 @@ Connection.prototype.authenticate = function(opts, callback) {
   }
   
   return apiAuthRequest(reqOpts, callback);
+
 }
 
 Connection.prototype.refreshToken = function(oauth, callback) {
