@@ -174,6 +174,7 @@ Connection.prototype.authenticate = function(opts, callback) {
 
 }
 
+
 Connection.prototype.refreshToken = function(oauth, callback) {
   var uri, reqOpts, bodyOpts;
   var self = this;
