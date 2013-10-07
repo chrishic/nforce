@@ -3,9 +3,11 @@
 var request     = require('request');
 var qs          = require('querystring');
 var url         = require('url');
+var utility     = require('util');
 var Record      = require('./lib/record');
 var QueryStream = require('./lib/querystream');
 var FDCStream   = require('./lib/fdcstream');
+var NForceError = require('./lib/error');
 var faye        = require('faye');
 var mime        = require('mime');
 
@@ -845,7 +847,7 @@ Connection.prototype.apexRest = function(restRequest, oauth, callback) {
 
   if(restRequest.urlParams!=null) {
     if(!Array.isArray(restRequest.urlParams)) {
-      return callback(new Error('URL parmams must be an array in form of [{key:\'key\', value:\'value\'}]'), null);
+      return callback(new Error('URL params must be an array in form of [{key:\'key\', value:\'value\'}]'), null);
     }
     
     params = '?';
@@ -1008,13 +1010,13 @@ var isJsonResponse = function(res) {
 
 var errors = {
   nonJsonResponse: function() {
-    return new Error('Non-JSON response from Salesforce');
+    return new NForceError.ApiCallFailure('Non-JSON response from Salesforce');
   },
   invalidJson: function() {
-    return new Error('Invalid JSON response from Salesforce');
+    return new NForceError.ApiCallFailure('Invalid JSON response from Salesforce');
   },
   emptyResponse: function() {
-    return new Error('Unexpected empty response');
+    return new NForceError.ApiCallFailure('Unexpected empty response');
   }
 }
 
@@ -1042,9 +1044,8 @@ var apiAuthRequest = function(opts, callback) {
       if(self.mode === 'single' && body.access_token) self.oauth = body;
       return callback(null, body);
     } else {
-      var e = new Error(body.error + ' - ' + body.error_description);
-      e.statusCode = res.statusCode;
-      return callback(e, null);
+      err = new NForceError.ApiCallFailure(body.error_description, body.error, res.statusCode);
+      return callback(err, null);
     }
 
   });
@@ -1066,7 +1067,7 @@ var apiBlobRequest = function(opts, oauth, callback) {
 
     // salesforce returned no body but an error in the header
     if(!body && res.headers && res.headers.error) {
-      return callback(new Error(res.headers.error), null);
+      return callback(NForceError.ApiCallFailure('Response has error in header with empty body', res.headers.error, res.statusCode), null);
     }
 
     // salesforce returned an ok of some sort
@@ -1082,16 +1083,14 @@ var apiBlobRequest = function(opts, oauth, callback) {
         } catch (e) {
           return callback(errors.invalidJson());
         }
-        err = new Error(body[0].message);
-        err.errorCode = body[0].errorCode;
-        err.statusCode = res.statusCode;
+        err = new NForceError.ApiCallFailure(body[0].message, body[0].errorCode, res.statusCode);
         err.messageBody = body[0].message;
         return callback(err, null);
       } 
     } 
     
     // we don't know what happened
-    return callback(new Error('Salesforce returned no body and status code ' + res.statusCode));
+    return callback(new NForceError.ApiCallFailure('Salesforce returned no body', null, res.statusCode));
 
   });
 }
@@ -1119,7 +1118,7 @@ var apiRequest = function(opts, oauth, sobject, callback) {
 
     // salesforce returned no body but an error in the header
     if(!body && res.headers && res.headers.error) {
-      return callback(new Error(res.headers.error), null);
+      return callback(NForceError.ApiCallFailure('Response has error in header with empty body', res.headers.error, res.statusCode), null);
     }
 
     // attempt to parse the json now
@@ -1142,15 +1141,13 @@ var apiRequest = function(opts, oauth, sobject, callback) {
 
     // salesforce returned an error with a body
     if(body) {
-      var e = new Error(body[0].message)
-      e.errorCode = body[0].errorCode;
-      e.statusCode = res.statusCode;
-      e.messageBody = body[0].message;
-      return callback(e, null);
+      err = new NForceError.ApiCallFailure(body[0].message, body[0].errorCode, res.statusCode);
+      err.messageBody = body[0].message;
+      return callback(err, null);
     } 
     
     // we don't know what happened
-    return callback(new Error('Salesforce returned no body and status code ' + res.statusCode));
+    return callback(new NForceError.ApiCallFailure('Salesforce returned no body', null, res.statusCode));
 
   });
 }

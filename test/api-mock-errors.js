@@ -1,4 +1,5 @@
 var nforce = require('../');
+var NForceError = require('../lib/error');
 var api = require('./mock/sfdc-rest-api');
 var port   = process.env.PORT || 3000;
 
@@ -22,6 +23,7 @@ describe('api-mock-errors', function() {
       api.setResponse(200, { 'content-type': 'application/json;charset=UTF-8' }, body);
       org.authenticate({ username: 'test', password: 'test'}, function(err, resp) {
         err.should.exist;
+        err.should.be.an.instanceof(NForceError.ApiCallFailure);
         err.message.should.equal('Invalid JSON response from Salesforce');
         done();
       });
@@ -32,6 +34,7 @@ describe('api-mock-errors', function() {
       api.setResponse(200, { 'content-type': 'application/json;charset=UTF-8' }, body);
       org.query('SELECT Id FROM Account', oauth, function(err, resp) {
         err.should.exist;
+        err.should.be.an.instanceof(NForceError.ApiCallFailure);
         err.message.should.equal('Invalid JSON response from Salesforce');
         done();
       });
@@ -46,6 +49,7 @@ describe('api-mock-errors', function() {
       api.setResponse(200, { 'content-type': 'text/html;charset=UTF-8' }, body);
       org.authenticate({ username: 'test', password: 'test'}, function(err, resp) {
         err.should.exist;
+        err.should.be.an.instanceof(NForceError.ApiCallFailure);
         err.message.should.equal('Non-JSON response from Salesforce');
         done();
       });
