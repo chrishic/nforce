@@ -1082,10 +1082,16 @@ var apiBlobRequest = function(opts, oauth, callback) {
         } catch (e) {
           return callback(errors.invalidJson());
         }
+      }
+      if (Array.isArray(body) && body.length > 0) {
         err = new NForceError.ApiCallFailure(body[0].message, body[0].errorCode, res.statusCode);
-        err.messageBody = body[0].message;
-        return callback(err, null);
-      } 
+      }
+      else {
+        //  didn't get a json response back -- just a simple string as the body
+        err = new NForceError.ApiCallFailure(body, null, res.statusCode);
+      }
+      err.messageBody = err.message;
+      return callback(err, null);
     } 
     
     // we don't know what happened
@@ -1140,10 +1146,16 @@ var apiRequest = function(opts, oauth, sobject, callback) {
 
     // salesforce returned an error with a body
     if(body) {
-      err = new NForceError.ApiCallFailure(body[0].message, body[0].errorCode, res.statusCode);
-      err.messageBody = body[0].message;
+      if (Array.isArray(body) && body.length > 0) {
+        err = new NForceError.ApiCallFailure(body[0].message, body[0].errorCode, res.statusCode);
+      }
+      else {
+        //  didn't get a json response back -- just a simple string as the body
+        err = new NForceError.ApiCallFailure(body, null, res.statusCode);
+      }
+      err.messageBody = err.message;
       return callback(err, null);
-    } 
+    }
     
     // we don't know what happened
     return callback(new NForceError.ApiCallFailure('Salesforce returned no body', null, res.statusCode));
