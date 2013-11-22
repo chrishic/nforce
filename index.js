@@ -173,7 +173,7 @@ Connection.prototype.authenticate = function(opts, callback) {
     }
   }
   
-  return apiAuthRequest(reqOpts, callback);
+  return self.apiAuthRequest(reqOpts, callback);
 
 }
 
@@ -212,7 +212,7 @@ Connection.prototype.refreshToken = function(oauth, callback) {
     }
   }
 
-  return apiAuthRequest(reqOpts, callback);
+  return self.apiAuthRequest(reqOpts, callback);
 }
 
 // api methods
@@ -242,7 +242,7 @@ Connection.prototype.getVersions = function(callback) {
   
   opts = { uri : 'http://na1.salesforce.com/services/data/', method: 'GET' };
   
-  return apiAuthRequest(opts, callback);
+  return this.apiAuthRequest(opts, callback);
 }
 
 Connection.prototype.getResources = function(oauth, callback) {
@@ -997,6 +997,37 @@ Connection.prototype.updatePassword = function(data, oauth, callback) {
   return apiRequest(opts, oauth, data, callback);
 }
 
+Connection.prototype.apiAuthRequest = function(opts, callback) {
+  var self = this;
+  return request(opts, function(err, res, body){
+    // request returned an error
+    if(err) return callback(err);
+
+    // request didn't return a response. sumptin bad happened
+    if(!res) return callback(errors.emptyResponse());
+
+    if(body && isJsonResponse(res)) {
+      try {
+        body = JSON.parse(body);
+      } catch (e) {
+        return callback(errors.invalidJson());
+      }
+    } else {
+      return callback(errors.nonJsonResponse());
+    }
+
+    if(res.statusCode === 200) {
+      // detect oauth response for single mode
+      if(self.mode === 'single' && body.access_token) self.oauth = body;
+      return callback(null, body);
+    } else {
+      err = new NForceError.ApiCallFailure(body.error_description, body.error, res.statusCode);
+      return callback(err, null);
+    }
+
+  });
+}
+
 // utility methods
 
 var validateOAuth = function(oauth) {
@@ -1034,37 +1065,6 @@ var errors = {
   emptyResponse: function() {
     return new NForceError.ApiCallFailure('Unexpected empty response');
   }
-}
-
-var apiAuthRequest = function(opts, callback) {
-  var self = this;
-  return request(opts, function(err, res, body){
-    // request returned an error
-    if(err) return callback(err);
-
-    // request didn't return a response. sumptin bad happened
-    if(!res) return callback(errors.emptyResponse());
-
-    if(body && isJsonResponse(res)) {
-      try {
-        body = JSON.parse(body);
-      } catch (e) {
-        return callback(errors.invalidJson());
-      }
-    } else {
-      return callback(errors.nonJsonResponse());
-    }
-
-    if(res.statusCode === 200) {
-      // detect oauth response for single mode
-      if(self.mode === 'single' && body.access_token) self.oauth = body;
-      return callback(null, body);
-    } else {
-      err = new NForceError.ApiCallFailure(body.error_description, body.error, res.statusCode);
-      return callback(err, null);
-    }
-
-  });
 }
 
 var apiBlobRequest = function(opts, oauth, callback) {
