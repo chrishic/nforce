@@ -9,6 +9,7 @@ var FDCStream   = require('./lib/fdcstream');
 var NForceError = require('./lib/error');
 var faye        = require('faye');
 var mime        = require('mime');
+var zlib        = require('zlib');
 
 // constants
 
@@ -91,6 +92,7 @@ var Connection = function(opts) {
   } else {
     this.mode = 'multi';
   }
+  this.enableCompression = (opts.enableCompression === true);
 }
 
 // oauth methods
@@ -1123,6 +1125,10 @@ var apiRequest = function(opts, oauth, sobject, callback) {
   } else {
     opts.headers['content-type'] = 'application/json';
   }
+
+  if (this.enableCompression) {
+    opts.headers['Accept-Encoding'] = 'gzip';
+  }
   
   return request(opts, function(err, res, body) {
     
@@ -1137,39 +1143,52 @@ var apiRequest = function(opts, oauth, sobject, callback) {
       return callback(NForceError.ApiCallFailure('Response has error in header with empty body', res.headers.error, res.statusCode), null);
     }
 
-    // attempt to parse the json now
-    if(isJsonResponse(res)) {
-      if(body) {
-        try {
-          body = JSON.parse(body);
-        } catch (e) {
-          return callback(errors.invalidJson());
+    var processResponse = function(data) {
+      // attempt to parse the json now
+      if(isJsonResponse(res)) {
+        if(data) {
+          try {
+            data = JSON.parse(data);
+          } catch (e) {
+            return callback(errors.invalidJson());
+          }
         }
       }
-    } 
 
-    // salesforce returned an ok of some sort
-    if(res.statusCode >= 200 && res.statusCode <= 204) {
-      // attach the id back to the sobject on insert
-      if(sobject && body && body.id && !sobject.Id && !sobject.id && !sobject.ID) sobject.Id = body.id;
-      return callback(null, body);
-    } 
+      // salesforce returned an ok of some sort
+      if(res.statusCode >= 200 && res.statusCode <= 204) {
+        // attach the id back to the sobject on insert
+        if(sobject && data && data.id && !sobject.Id && !sobject.id && !sobject.ID) sobject.Id = data.id;
+        return callback(null, data);
+      }
 
-    // salesforce returned an error with a body
-    if(body) {
-      if (Array.isArray(body) && body.length > 0) {
-        err = new NForceError.ApiCallFailure(body[0].message, body[0].errorCode, res.statusCode);
+      // salesforce returned an error with a data
+      if(data) {
+        if (Array.isArray(data) && data.length > 0) {
+          err = new NForceError.ApiCallFailure(data[0].message, data[0].errorCode, res.statusCode);
+        }
+        else {
+          //  didn't get a json response back -- just a simple string as the body
+          err = new NForceError.ApiCallFailure(data, null, res.statusCode);
+        }
+        err.messageBody = err.message;
+        return callback(err, null);
       }
-      else {
-        //  didn't get a json response back -- just a simple string as the body
-        err = new NForceError.ApiCallFailure(body, null, res.statusCode);
-      }
-      err.messageBody = err.message;
-      return callback(err, null);
+
+      // we don't know what happened
+      return callback(new NForceError.ApiCallFailure('Salesforce returned no body', null, res.statusCode));
+    };
+
+    if (res.headers && res.headers['Accept-Encoding'] === 'gzip' && body) {
+      //  response is compressed - decompress it
+      zlib.gunzip(body, function(err, data) {
+        if (err) return callback(err);
+        processResponse(data);
+      });
     }
-    
-    // we don't know what happened
-    return callback(new NForceError.ApiCallFailure('Salesforce returned no body', null, res.statusCode));
+    else {
+      processResponse(body);
+    }
 
   });
 }
