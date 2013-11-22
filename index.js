@@ -92,7 +92,7 @@ var Connection = function(opts) {
   } else {
     this.mode = 'multi';
   }
-  this.enableCompression = (opts.enableCompression === true);
+  this.gzip = (opts.gzip === true);
 }
 
 // oauth methods
@@ -259,7 +259,7 @@ Connection.prototype.getResources = function(oauth, callback) {
   if(!validateOAuth(oauth)) return callback(new Error('Invalid oauth object argument'), null);
   
   uri = oauth.instance_url + '/services/data/' + this.apiVersion;
-  opts = { uri: uri, method: 'GET' }
+  opts = { uri: uri, method: 'GET', gzip: this.gzip }
   
   return apiRequest(opts, oauth, null, callback);
 }
@@ -280,7 +280,7 @@ Connection.prototype.getSObjects = function(oauth, callback) {
   if(!validateOAuth(oauth)) return callback(new Error('Invalid oauth object argument'), null);
   
   uri = oauth.instance_url + '/services/data/' + this.apiVersion + '/sobjects';
-  opts = { uri: uri, method: 'GET' }
+  opts = { uri: uri, method: 'GET', gzip: this.gzip }
   
   return apiRequest(opts, oauth, null, function(err, resp){
     if(err) {
@@ -315,7 +315,7 @@ Connection.prototype.getMetadata = function(data, oauth, callback) {
   if(!validateOAuth(oauth)) return callback(new Error('Invalid oauth object argument'), null);
   
   uri = oauth.instance_url + '/services/data/' + this.apiVersion + '/sobjects/' + data;
-  opts = { uri: uri, method: 'GET' }
+  opts = { uri: uri, method: 'GET', gzip: this.gzip }
   
   return apiRequest(opts, oauth, null, callback);
 }
@@ -338,7 +338,7 @@ Connection.prototype.getDescribe = function(data, oauth, callback) {
   if(!validateOAuth(oauth)) return callback(new Error('Invalid oauth object argument'), null);
   
   uri = oauth.instance_url + '/services/data/' + this.apiVersion + '/sobjects/' + data + '/describe';
-  opts = { uri: uri, method: 'GET' }
+  opts = { uri: uri, method: 'GET', gzip: this.gzip }
   
   return apiRequest(opts, oauth, null, callback);
 }
@@ -552,7 +552,7 @@ Connection.prototype.getRecord = function(data, oauth, callback) {
     uri += '?' + qs.stringify(query);
   }
   
-  opts = { uri: uri, method: 'GET'}
+  opts = { uri: uri, method: 'GET', gzip: this.gzip }
   
   return apiRequest(opts, oauth, null, function(err, resp){
     if(!err) {
@@ -716,7 +716,7 @@ Connection.prototype._queryHandler = function(query, oauth, all, callback) {
   // support queryAll
   if(all) uri += 'All';
 
-  opts = { uri: uri, method: 'GET', qs: { q: query } }
+  opts = { uri: uri, method: 'GET', qs: { q: query }, gzip: this.gzip }
   
   apiRequest(opts, oauth, null, function(err, resp){
     if (stream.isStreaming()) {
@@ -776,7 +776,7 @@ Connection.prototype.search = function(search, oauth, callback) {
   if(!validateOAuth(oauth)) return callback(new Error('Invalid oauth object argument'), null);
   
   uri = oauth.instance_url + '/services/data/' + this.apiVersion + '/search';
-  opts = { uri: uri, method: 'GET', qs: { q: search } }
+  opts = { uri: uri, method: 'GET', qs: { q: search }, gzip: this.gzip }
   
   return apiRequest(opts, oauth, null, function(err, resp){
     if(!err) {
@@ -810,7 +810,7 @@ Connection.prototype.getUrl = function(url, oauth, callback) {
   if(!validateOAuth(oauth)) return callback(new Error('Invalid oauth object argument'), null);
   
   uri = oauth.instance_url + url;
-  opts = { uri: uri, method: 'GET' }
+  opts = { uri: uri, method: 'GET', gzip: this.gzip }
   
   return apiRequest(opts, oauth, null, callback);
 }
@@ -849,10 +849,14 @@ Connection.prototype.apexRest = function(restRequest, oauth, callback) {
   if(restRequest.method==null || typeof restRequest.method !== 'string'){
     restRequest.method = 'GET';
   }
-  
+
   uri = oauth.instance_url + '/services/apexrest/' + restRequest.uri;
   opts = { uri: uri, method: restRequest.method}
   
+  if (restRequest.method === 'GET'){
+    opts.gzip = this.gzip;
+  }
+
   if(restRequest.body!=null) {
     opts.body = typeof restRequest.body === 'string' ? restRequest.body : JSON.stringify(restRequest.body);
   }
@@ -1126,8 +1130,10 @@ var apiRequest = function(opts, oauth, sobject, callback) {
     opts.headers['content-type'] = 'application/json';
   }
 
-  if (this.enableCompression) {
+  if (opts.gzip === true) {
     opts.headers['Accept-Encoding'] = 'gzip';
+    opts.encoding = null;
+    delete opts.gzip;
   }
   
   return request(opts, function(err, res, body) {
@@ -1179,7 +1185,7 @@ var apiRequest = function(opts, oauth, sobject, callback) {
       return callback(new NForceError.ApiCallFailure('Salesforce returned no body', null, res.statusCode));
     };
 
-    if (res.headers && res.headers['Accept-Encoding'] === 'gzip' && body) {
+    if (res.headers && res.headers['content-encoding'] === 'gzip' && body) {
       //  response is compressed - decompress it
       zlib.gunzip(body, function(err, data) {
         if (err) return callback(err);
