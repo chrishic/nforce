@@ -1175,7 +1175,7 @@ Connection.prototype._apiRequest = function(opts, oauth, sobject, callback) {
         return callback(null, data);
       }
 
-      // salesforce returned an error with a data
+      // salesforce returned an error with a body
       if(data) {
         if (Array.isArray(data) && data.length > 0) {
           err = new NForceError.ApiCallFailure(data[0].message, data[0].errorCode, res.statusCode);
