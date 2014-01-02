@@ -171,7 +171,6 @@ Connection.prototype.authenticate = function(opts, callback) {
       'Content-Type': 'application/x-www-form-urlencoded'
     }
   }
-  
   return this._apiAuthRequest(reqOpts, callback);
 }
 
@@ -999,37 +998,6 @@ Connection.prototype.updatePassword = function(data, oauth, callback) {
   return this._apiRequest(opts, oauth, data, callback);
 }
 
-Connection.prototype.apiAuthRequest = function(opts, callback) {
-  var self = this;
-  return request(opts, function(err, res, body){
-    // request returned an error
-    if(err) return callback(err);
-
-    // request didn't return a response. sumptin bad happened
-    if(!res) return callback(errors.emptyResponse());
-
-    if(body && isJsonResponse(res)) {
-      try {
-        body = JSON.parse(body);
-      } catch (e) {
-        return callback(errors.invalidJson());
-      }
-    } else {
-      return callback(errors.nonJsonResponse());
-    }
-
-    if(res.statusCode === 200) {
-      // detect oauth response for single mode
-      if(self.mode === 'single' && body.access_token) self.oauth = body;
-      return callback(null, body);
-    } else {
-      err = new NForceError.ApiCallFailure(body.error_description, body.error, res.statusCode);
-      return callback(err, null);
-    }
-
-  });
-}
-
 // utility methods
 
 var validateOAuth = function(oauth) {
@@ -1097,9 +1065,8 @@ Connection.prototype._apiAuthRequest = function(opts, callback) {
       }
       return callback(null, body);
     } else {
-      var e = new Error(body.error + ' - ' + body.error_description);
-      e.statusCode = res.statusCode;
-      return callback(e, null);
+      err = new NForceError.ApiCallFailure(body.error_description, body.error, res.statusCode);
+      return callback(err, null);
     }
 
   });
