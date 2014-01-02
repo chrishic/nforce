@@ -171,7 +171,9 @@ Connection.prototype.authenticate = function(opts, callback) {
       'Content-Type': 'application/x-www-form-urlencoded'
     }
   }
+
   return this._apiAuthRequest(reqOpts, callback);
+
 }
 
 
