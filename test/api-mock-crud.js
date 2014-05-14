@@ -1,4 +1,5 @@
 var nforce = require('../');
+var should = require('should');
 var api = require('./mock/sfdc-rest-api');
 var port   = process.env.PORT || 3000;
 
@@ -23,7 +24,11 @@ describe('api-mock-crud', function() {
         Name: 'Test Account',
         Test_Field__c: 'blah'
       });
-      org.insert(obj, oauth, function(err, res) {
+      org.insert({ sobject: obj, oauth: oauth }, function(err, res) {
+        if(err) throw err;
+        var body = JSON.parse(api.getLastRequest().body);
+        should.exist(body.name);
+        should.exist(body.test_field__c);
         api.getLastRequest().url.should.equal('/services/data/v27.0/sobjects/account');
         api.getLastRequest().method.should.equal('POST');
         done();
@@ -39,8 +44,9 @@ describe('api-mock-crud', function() {
         Name: 'Test Account',
         Test_Field__c: 'blah'
       });
-      obj.Id = 'someid';
-      org.update(obj, oauth, function(err, res) {
+      obj.setId('someid');
+      org.update({ sobject: obj, oauth: oauth }, function(err, res) {
+        if(err) throw err;
         api.getLastRequest().url.should.equal('/services/data/v27.0/sobjects/account/someid');
         api.getLastRequest().method.should.equal('PATCH');
         done();
@@ -56,12 +62,13 @@ describe('api-mock-crud', function() {
         Name: 'Test Account',
         Test_Field__c: 'blah'
       });
-      obj.setExternalId('My_Ext_Id__c', 'abc123')
-      org.upsert(obj, oauth, function(err, res) {
+      obj.setExternalId('My_Ext_Id__c', 'abc123');
+      org.upsert({ sobject: obj, oauth: oauth }, function(err, res) {
+        if(err) throw err;
         var body = JSON.parse(api.getLastRequest().body);
-        body.Name.should.exist;
-        body.Test_Field__c.should.exist;
-        api.getLastRequest().url.should.equal('/services/data/v27.0/sobjects/account/My_Ext_Id__c/abc123');
+        should.exist(body.name);
+        should.exist(body.test_field__c);
+        api.getLastRequest().url.should.equal('/services/data/v27.0/sobjects/account/my_ext_id__c/abc123');
         api.getLastRequest().method.should.equal('PATCH');
         done();
       });
@@ -76,10 +83,23 @@ describe('api-mock-crud', function() {
         Name: 'Test Account',
         Test_Field__c: 'blah'
       });
-      obj.Id = 'someid';
-      org.delete(obj, oauth, function(err, res) {
+      obj.setId('someid');
+      org.delete({ sobject: obj, oauth: oauth }, function(err, res) {
+        if(err) throw err;
         api.getLastRequest().url.should.equal('/services/data/v27.0/sobjects/account/someid');
         api.getLastRequest().method.should.equal('DELETE');
+        done();
+      });
+    });
+
+  });
+
+  describe('#apexRest', function() {
+
+    it('should create a proper request for a custom Apex REST endpoint', function(done) {
+      org.apexRest({ uri: 'sample', oauth: oauth }, function(err, res) {
+        api.getLastRequest().url.should.equal('/services/apexrest/sample');
+        api.getLastRequest().method.should.equal('GET');
         done();
       });
     });
