@@ -795,7 +795,7 @@ Connection.prototype._apiRequest = function(opts, callback) {
           //  didn't get a json response back -- just a simple string as the body
           e = new NForceError.ApiCallFailure(data, null, res.statusCode);
         }
-        e.messageBody = err.message;
+        e.messageBody = e.message;
         return callback(e, null);
       }
 
