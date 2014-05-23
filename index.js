@@ -1039,6 +1039,29 @@ var errors = {
   }
 }
 
+var sendApiResponse = function(callback, data, res) {
+  if (!callback || typeof callback !== 'function') {
+    callback = function() {};
+  }
+
+  if (callback.length === 3) {
+    var meta = {};
+    if (res && res.headers) {
+      var apiLimitHeader = res.headers['sforce-limit-info'];
+      if (apiLimitHeader && typeof apiLimitHeader === 'string') {
+        var parts = apiLimitHeader.split('=');
+        if (parts && parts.length === 2) {
+          meta[parts[0]] = parts[1];
+        }
+      }
+    }
+    callback(null, data, meta);
+  }
+  else {
+    callback(null, data);
+  }
+};
+
 Connection.prototype._apiAuthRequest = function(opts, callback) {
 
   var self = this;
@@ -1065,7 +1088,7 @@ Connection.prototype._apiAuthRequest = function(opts, callback) {
       if(self.mode === 'single' && body.access_token) {
         self.oauth = body;
       }
-      return callback(null, body);
+      return sendApiResponse(callback, body, res);
     } else {
       err = new NForceError.ApiCallFailure(body.error_description, body.error, res.statusCode);
       return callback(err, null);
@@ -1095,7 +1118,7 @@ Connection.prototype._apiBlobRequest = function(opts, oauth, callback) {
 
     // salesforce returned an ok of some sort
     if(res.statusCode >= 200 && res.statusCode <= 204) {
-      return callback(null, body);
+      return sendApiResponse(callback, body, res);
     } 
 
     // salesforce returned an error with a body
@@ -1172,7 +1195,7 @@ Connection.prototype._apiRequest = function(opts, oauth, sobject, callback) {
       if(res.statusCode >= 200 && res.statusCode <= 204) {
         // attach the id back to the sobject on insert
         if(sobject && data && data.id && !sobject.Id && !sobject.id && !sobject.ID) sobject.Id = data.id;
-        return callback(null, data);
+        return sendApiResponse(callback, data, res);
       }
 
       // salesforce returned an error with a body
