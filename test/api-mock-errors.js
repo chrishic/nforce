@@ -70,6 +70,22 @@ describe('api-mock-errors', function() {
 
   });
 
+  describe('request limit exceeded', function() {
+
+    it('should return a request limit exceeded error', function(done) {
+      var body = '[{"message":"TotalRequests Limit exceeded.", "errorCode": "REQUEST_LIMIT_EXCEEDED"}]';
+      api.setResponse(403, { 'content-type': 'application/json;charset=UTF-8', 'sforce-limit-info' : 'api-usage=5000/5000' }, body);
+      org.query('SELECT Id FROM Account', oauth, function(err, res) {
+        err.should.exist;
+        err.should.be.an.instanceof(NForceError.ApiCallFailure);
+        err.message.should.equal('TotalRequests Limit exceeded.');
+        err.meta['api-usage'].should.exist;
+        done();
+      });
+    });
+
+  });
+
   // reset the lastRequest
   afterEach(function(done) {
     api.reset();
