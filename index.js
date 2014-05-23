@@ -1039,23 +1039,30 @@ var errors = {
   }
 }
 
+var getMetaInfo = function(res) {
+    var meta;
+
+    if (res && res.headers) {
+      var apiLimitHeader = res.headers['sforce-limit-info'];
+      if (apiLimitHeader && typeof apiLimitHeader === 'string') {
+        var parts = apiLimitHeader.split('=');
+        if (parts && parts.length === 2) {
+          meta = {};
+          meta[parts[0]] = parts[1];
+        }
+      }
+    }
+
+    return meta;
+};
+
 var sendApiResponse = function(callback, data, res) {
   if (!callback || typeof callback !== 'function') {
     callback = function() {};
   }
 
   if (callback.length === 3) {
-    var meta = {};
-    if (res && res.headers) {
-      var apiLimitHeader = res.headers['sforce-limit-info'];
-      if (apiLimitHeader && typeof apiLimitHeader === 'string') {
-        var parts = apiLimitHeader.split('=');
-        if (parts && parts.length === 2) {
-          meta[parts[0]] = parts[1];
-        }
-      }
-    }
-    callback(null, data, meta);
+    callback(null, data, getMetaInfo(res));
   }
   else {
     callback(null, data);
@@ -1090,7 +1097,7 @@ Connection.prototype._apiAuthRequest = function(opts, callback) {
       }
       return sendApiResponse(callback, body, res);
     } else {
-      err = new NForceError.ApiCallFailure(body.error_description, body.error, res.statusCode);
+      err = new NForceError.ApiCallFailure(body.error_description, body.error, res.statusCode, getMetaInfo(res));
       return callback(err, null);
     }
 
@@ -1113,7 +1120,7 @@ Connection.prototype._apiBlobRequest = function(opts, oauth, callback) {
 
     // salesforce returned no body but an error in the header
     if(!body && res.headers && res.headers.error) {
-      return callback(NForceError.ApiCallFailure('Response has error in header with empty body', res.headers.error, res.statusCode), null);
+      return callback(NForceError.ApiCallFailure('Response has error in header with empty body', res.headers.error, res.statusCode, getMetaInfo(res)), null);
     }
 
     // salesforce returned an ok of some sort
@@ -1131,18 +1138,18 @@ Connection.prototype._apiBlobRequest = function(opts, oauth, callback) {
         }
       }
       if (Array.isArray(body) && body.length > 0) {
-        err = new NForceError.ApiCallFailure(body[0].message, body[0].errorCode, res.statusCode);
+        err = new NForceError.ApiCallFailure(body[0].message, body[0].errorCode, res.statusCode, getMetaInfo(res));
       }
       else {
         //  didn't get a json response back -- just a simple string as the body
-        err = new NForceError.ApiCallFailure(body, null, res.statusCode);
+        err = new NForceError.ApiCallFailure(body, null, res.statusCode, getMetaInfo(res));
       }
       err.messageBody = err.message;
       return callback(err, null);
     } 
     
     // we don't know what happened
-    return callback(new NForceError.ApiCallFailure('Salesforce returned no body', null, res.statusCode));
+    return callback(new NForceError.ApiCallFailure('Salesforce returned no body', null, res.statusCode, getMetaInfo(res)));
 
   });
 }
@@ -1176,7 +1183,7 @@ Connection.prototype._apiRequest = function(opts, oauth, sobject, callback) {
 
     // salesforce returned no body but an error in the header
     if(!body && res.headers && res.headers.error) {
-      return callback(NForceError.ApiCallFailure('Response has error in header with empty body', res.headers.error, res.statusCode), null);
+      return callback(NForceError.ApiCallFailure('Response has error in header with empty body', res.headers.error, res.statusCode, getMetaInfo(res)), null);
     }
 
     var processResponse = function(data) {
@@ -1201,18 +1208,18 @@ Connection.prototype._apiRequest = function(opts, oauth, sobject, callback) {
       // salesforce returned an error with a body
       if(data) {
         if (Array.isArray(data) && data.length > 0) {
-          err = new NForceError.ApiCallFailure(data[0].message, data[0].errorCode, res.statusCode);
+          err = new NForceError.ApiCallFailure(data[0].message, data[0].errorCode, res.statusCode, getMetaInfo(res));
         }
         else {
           //  didn't get a json response back -- just a simple string as the body
-          err = new NForceError.ApiCallFailure(data, null, res.statusCode);
+          err = new NForceError.ApiCallFailure(data, null, res.statusCode, getMetaInfo(res));
         }
         err.messageBody = err.message;
         return callback(err, null);
       }
 
       // we don't know what happened
-      return callback(new NForceError.ApiCallFailure('Salesforce returned no body', null, res.statusCode));
+      return callback(new NForceError.ApiCallFailure('Salesforce returned no body', null, res.statusCode, getMetaInfo(res)));
     };
 
     if (res.headers && res.headers['content-encoding'] === 'gzip' && body) {
