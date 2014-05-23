@@ -1080,26 +1080,43 @@ Connection.prototype._apiAuthRequest = function(opts, callback) {
     // request didn't return a response. sumptin bad happened
     if(!res) return callback(errors.emptyResponse());
 
+    // salesforce returned no body but an error in the header
+    if(!body && res.headers && res.headers.error) {
+      return callback(NForceError.ApiCallFailure('Response has error in header with empty body', res.headers.error, res.statusCode, getMetaInfo(res)));
+    }
+
     if(body && isJsonResponse(res)) {
       try {
         body = JSON.parse(body);
       } catch (e) {
         return callback(errors.invalidJson());
       }
-    } else {
-      return callback(errors.nonJsonResponse());
     }
 
     if(res.statusCode === 200) {
+      if (!isJsonResponse(res)) {
+        return callback(errors.nonJsonResponse());
+      }
       // detect oauth response for single mode
       if(self.mode === 'single' && body.access_token) {
         self.oauth = body;
       }
       return sendApiResponse(callback, body, res);
-    } else {
-      err = new NForceError.ApiCallFailure(body.error_description, body.error, res.statusCode, getMetaInfo(res));
+    }
+
+    if (body) {
+      if (typeof body === 'object') {
+        err = new NForceError.ApiCallFailure(body.error_description, body.error, res.statusCode, getMetaInfo(res));
+      }
+      else {
+        //  didn't get a json response back -- just a simple string as the body
+        err = new NForceError.ApiCallFailure(body, null, res.statusCode, getMetaInfo(res));
+      }
       return callback(err, null);
     }
+
+    // we don't know what happened
+    return callback(new NForceError.ApiCallFailure('Salesforce returned no body', null, res.statusCode, getMetaInfo(res)));
 
   });
 }
@@ -1123,20 +1140,24 @@ Connection.prototype._apiBlobRequest = function(opts, oauth, callback) {
       return callback(NForceError.ApiCallFailure('Response has error in header with empty body', res.headers.error, res.statusCode, getMetaInfo(res)), null);
     }
 
+    if(body && isJsonResponse(res)) {
+      try {
+        body = JSON.parse(body);
+      } catch (e) {
+        return callback(errors.invalidJson());
+      }
+    }
+
     // salesforce returned an ok of some sort
     if(res.statusCode >= 200 && res.statusCode <= 204) {
+      if (!isJsonResponse(res)) {
+        return callback(errors.nonJsonResponse());
+      }
       return sendApiResponse(callback, body, res);
-    } 
+    }
 
     // salesforce returned an error with a body
     if(body) {
-      if(isJsonResponse(res)) {
-        try {
-          body = JSON.parse(body);
-        } catch (e) {
-          return callback(errors.invalidJson());
-        }
-      }
       if (Array.isArray(body) && body.length > 0) {
         err = new NForceError.ApiCallFailure(body[0].message, body[0].errorCode, res.statusCode, getMetaInfo(res));
       }
@@ -1200,6 +1221,9 @@ Connection.prototype._apiRequest = function(opts, oauth, sobject, callback) {
 
       // salesforce returned an ok of some sort
       if(res.statusCode >= 200 && res.statusCode <= 204) {
+        if (!isJsonResponse(res)) {
+          return callback(errors.nonJsonResponse());
+        }
         // attach the id back to the sobject on insert
         if(sobject && data && data.id && !sobject.Id && !sobject.id && !sobject.ID) sobject.Id = data.id;
         return sendApiResponse(callback, data, res);
