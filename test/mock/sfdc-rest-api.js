@@ -1,9 +1,12 @@
 var http        = require('http');
+var util        = require('util');
 var port        = process.env.PORT || 3000;
 var lastRequest = null;
 var nextResponse = null;
 var closeOnRequest = false;
 var isListening = false;
+var apiCount = 0;
+var apiLimit = 5000;
 
 var sockets = [];
 
@@ -28,6 +31,8 @@ module.exports.start = function(port, cb) {
 
     req.on('end', function() {
 
+      apiCount++;
+
       if(closeOnRequest) {
         if(sockets.length) {
           for(var i=0; i<sockets.length; i++) {
@@ -37,14 +42,20 @@ module.exports.start = function(port, cb) {
         return server.close();
       }
 
+      var apiUsageHeader = util.format('api-usage=%d/%d', apiCount, apiLimit);
+
       if(nextResponse) {
+        if (nextResponse && nextResponse.headers && typeof nextResponse.headers === 'object') {
+          nextResponse.headers['sforce-limit-info'] = apiUsageHeader;
+        }
         res.writeHead(nextResponse.code, nextResponse.headers);
         if(nextResponse.body) {
           res.write(nextResponse.body, 'utf8')
         }
       } else {
         res.writeHead(200, { 
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'sforce-limit-info': apiUsageHeader
         });
       } 
       res.end();

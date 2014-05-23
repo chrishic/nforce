@@ -86,6 +86,19 @@ describe('api-mock-crud', function() {
 
   });
 
+  describe('#extended-callback-info', function() {
+
+    it('should create a proper request on getDescribe', function(done) {
+      org.getDescribe('account', oauth, function(err, res, meta) {
+        api.getLastRequest().url.should.equal('/services/data/v27.0/sobjects/account/describe');
+        api.getLastRequest().method.should.equal('GET');
+        meta['api-usage'].should.exist;
+        done();
+      });
+    });
+
+  });
+
   // reset the lastRequest
   afterEach(function() {
     api.reset();
