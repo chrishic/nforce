@@ -93,6 +93,12 @@ var Connection = function(opts) {
     this.mode = 'multi';
   }
   this.gzip = (opts.gzip === true);
+
+  if (typeof opts.maxSockets === 'number') {
+    this.agentOptions = {
+      "maxSockets": opts.maxSockets
+    };
+  }
 }
 
 // oauth methods
@@ -1069,7 +1075,26 @@ var sendApiResponse = function(callback, data, res) {
   }
 };
 
+var setRequestAgent = function(opts, agentOptions) {
+  if (!opts || typeof opts !== 'object') {
+    opts = {};
+  }
+
+  if (agentOptions && typeof agentOptions === 'object') {
+    if (agentOptions.maxSockets === 0) {
+      opts.pool = false;
+    }
+    else {
+      opts.agentOptions = agentOptions;
+    }
+  }
+
+  return opts;
+};
+
 Connection.prototype._apiAuthRequest = function(opts, callback) {
+
+  opts = setRequestAgent(opts, this.agentOptions);
 
   var self = this;
 
@@ -1122,6 +1147,8 @@ Connection.prototype._apiAuthRequest = function(opts, callback) {
 }
 
 Connection.prototype._apiBlobRequest = function(opts, oauth, callback) {
+
+  opts = setRequestAgent(opts, this.agentOptions);
 
   opts.headers = {
     'content-type': 'application/json',
@@ -1177,6 +1204,8 @@ Connection.prototype._apiBlobRequest = function(opts, oauth, callback) {
 
 Connection.prototype._apiRequest = function(opts, oauth, sobject, callback) {
 
+  opts = setRequestAgent(opts, this.agentOptions);
+
   opts.headers = {
     'Authorization': 'Bearer ' + oauth.access_token,
     'Accept': 'application/json;charset=UTF-8'
@@ -1193,7 +1222,7 @@ Connection.prototype._apiRequest = function(opts, oauth, sobject, callback) {
     opts.encoding = null;
     delete opts.gzip;
   }
-  
+
   return request(opts, function(err, res, body) {
     
     // request returned an error
