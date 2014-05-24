@@ -89,7 +89,20 @@ module.exports.getClient = function() {
     clientSecret: 'adsfkdsalfajdskfa',
     redirectUri: 'http://localhost:' + port + '/oauth/_callback',
     loginUri: 'http://localhost:' + port + '/login/uri',
-    apiVersion: '27.0'
+    apiVersion: '27.0',
+    maxSockets: Infinity
+  }
+}
+
+// return an example client with connection pooling disabled
+module.exports.getNoPoolingClient = function() {
+  return {
+    clientId: 'ADFJSD234ADF765SFG55FD54S',
+    clientSecret: 'adsfkdsalfajdskfa',
+    redirectUri: 'http://localhost:' + port + '/oauth/_callback',
+    loginUri: 'http://localhost:' + port + '/login/uri',
+    apiVersion: '27.0',
+    maxSockets: 0
   }
 }
 

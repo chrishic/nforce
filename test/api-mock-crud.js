@@ -5,7 +5,7 @@ var port   = process.env.PORT || 3000;
 var server;
 var lastRequest;
 
-var org = nforce.createConnection(api.getClient());
+var org = nforce.createConnection(api.getNoPoolingClient());
 
 var oauth = api.getOAuth();
 
