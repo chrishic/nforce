@@ -1177,7 +1177,7 @@ Connection.prototype._apiBlobRequest = function(opts, oauth, callback) {
 
     // salesforce returned an ok of some sort
     if(res.statusCode >= 200 && res.statusCode <= 204) {
-      if (!isJsonResponse(res)) {
+      if (res.statusCode !== 204 && !isJsonResponse(res)) {
         return callback(errors.nonJsonResponse());
       }
       return sendApiResponse(callback, body, res);
@@ -1250,7 +1250,7 @@ Connection.prototype._apiRequest = function(opts, oauth, sobject, callback) {
 
       // salesforce returned an ok of some sort
       if(res.statusCode >= 200 && res.statusCode <= 204) {
-        if (!isJsonResponse(res)) {
+        if (res.statusCode !== 204 && !isJsonResponse(res)) {
           return callback(errors.nonJsonResponse());
         }
         // attach the id back to the sobject on insert
