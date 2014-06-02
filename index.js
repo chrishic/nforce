@@ -787,7 +787,7 @@ Connection.prototype.search = function(search, oauth, callback) {
   uri = oauth.instance_url + '/services/data/' + this.apiVersion + '/search';
   opts = { uri: uri, method: 'GET', qs: { q: search }, gzip: this.gzip }
   
-  return this._apiRequest(opts, oauth, null, function(err, resp){
+  return this._apiRequest(opts, oauth, null, function(err, resp, meta){
     if(!err) {
       if(resp.length) {
         var recs = [];
