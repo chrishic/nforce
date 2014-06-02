@@ -287,7 +287,7 @@ Connection.prototype.getSObjects = function(oauth, callback) {
   uri = oauth.instance_url + '/services/data/' + this.apiVersion + '/sobjects';
   opts = { uri: uri, method: 'GET', gzip: this.gzip }
   
-  return this._apiRequest(opts, oauth, null, function(err, resp){
+  return this._apiRequest(opts, oauth, null, function(err, resp, meta){
     if(err) {
       callback(err, null);
     } else {
@@ -297,7 +297,9 @@ Connection.prototype.getSObjects = function(oauth, callback) {
           if(so.keyPrefix != null) self._cache.keyPrefixes[so.keyPrefix] = so.name;
         }
       }
-      callback(null, resp);
+      var cbArgs = [null, resp];
+      if (callback.length === 3) cbArgs.push(meta);
+      callback.apply(null, cbArgs);
     }
   });
 }
@@ -559,11 +561,13 @@ Connection.prototype.getRecord = function(data, oauth, callback) {
   
   opts = { uri: uri, method: 'GET', gzip: this.gzip }
   
-  return this._apiRequest(opts, oauth, null, function(err, resp){
+  return this._apiRequest(opts, oauth, null, function(err, resp, meta){
     if(!err) {
       resp = new Record(resp);
     }
-    callback(err, resp);
+    var cbArgs = [err, resp];
+    if (callback.length === 3) cbArgs.push(meta);
+    callback.apply(null, cbArgs);
   });
 }
 
@@ -622,9 +626,7 @@ Connection.prototype.getAttachmentBody = function(id, oauth, callback) {
     + '/sobjects/Attachment/' + id + '/body'
   opts = { uri: uri, method: 'GET' }
   
-  return this._apiBlobRequest(opts, oauth, function(err, resp) {
-    callback(err, resp);
-  });
+  return this._apiBlobRequest(opts, oauth, callback);
 }
 
 Connection.prototype.getDocumentBody = function(id, oauth, callback) {
@@ -648,9 +650,7 @@ Connection.prototype.getDocumentBody = function(id, oauth, callback) {
     + '/sobjects/Document/' + id + '/body'
   opts = { uri: uri, method: 'GET' }
   
-  return this._apiBlobRequest(opts, oauth, function(err, resp) {
-    callback(err, resp);
-  });
+  return this._apiBlobRequest(opts, oauth, callback);
 }
 
 Connection.prototype.getContentVersionBody = function(id, oauth, callback) {
@@ -674,9 +674,7 @@ Connection.prototype.getContentVersionBody = function(id, oauth, callback) {
     + '/sobjects/ContentVersion/' + id + '/body'
   opts = { uri: uri, method: 'GET' }
   
-  return this._apiBlobRequest(opts, oauth, function(err, resp) {
-    callback(err, resp);
-  });
+  return this._apiBlobRequest(opts, oauth, callback);
 }
 
 Connection.prototype._queryHandler = function(query, oauth, all, callback) {
@@ -717,7 +715,7 @@ Connection.prototype._queryHandler = function(query, oauth, all, callback) {
 
   opts = { uri: uri, method: 'GET', qs: { q: query }, gzip: this.gzip }
   
-  this._apiRequest(opts, oauth, null, function(err, resp){
+  this._apiRequest(opts, oauth, null, function(err, resp, meta){
     if (stream.isStreaming()) {
       if (err) {
         stream.error(err);
@@ -742,7 +740,9 @@ Connection.prototype._queryHandler = function(query, oauth, all, callback) {
           resp.records = recs;
         }
       }
-      callback(err, resp);
+      var cbArgs = [err, resp];
+      if (callback.length === 3) cbArgs.push(meta);
+      callback.apply(null, cbArgs);
     }
   });
 
@@ -797,7 +797,9 @@ Connection.prototype.search = function(search, oauth, callback) {
         resp = recs;
       }
     }
-    callback(err, resp);
+    var cbArgs = [err, resp];
+    if (callback.length === 3) cbArgs.push(meta);
+    callback.apply(null, cbArgs);
   });
 }
 
