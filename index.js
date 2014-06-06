@@ -1093,6 +1093,15 @@ var setRequestAgent = function(opts, agentOptions) {
   return opts;
 };
 
+var remapRequestError = function(err, elapsedMillis) {
+  var status;
+  var res;
+  if (err && typeof err === 'object' && err.code === 'ECONNRESET') {
+    err = new NForceError.ApiCallFailure(err.message, err.code, status, getMetaInfo(res, elapsedMillis));
+  }
+  return err;
+};
+
 Connection.prototype._apiAuthRequest = function(opts, callback) {
 
   opts = setRequestAgent(opts, this.agentOptions);
@@ -1106,7 +1115,7 @@ Connection.prototype._apiAuthRequest = function(opts, callback) {
     var elapsedMillis = Date.now() - start;
 
     // request returned an error
-    if(err) return callback(err);
+    if(err) return callback(remapRequestError(err, elapsedMillis));
 
     // request didn't return a response. sumptin bad happened
     if(!res) return callback(errors.emptyResponse());
@@ -1168,7 +1177,7 @@ Connection.prototype._apiBlobRequest = function(opts, oauth, callback) {
     var elapsedMillis = Date.now() - start;
 
     // request returned an error
-    if(err) return callback(err, null);
+    if(err) return callback(remapRequestError(err, elapsedMillis));
 
     // request didn't return a response. sumptin bad happened
     if(!res) return callback(errors.emptyResponse());
@@ -1241,7 +1250,7 @@ Connection.prototype._apiRequest = function(opts, oauth, sobject, callback) {
     var elapsedMillis = Date.now() - start;
 
     // request returned an error
-    if(err) return callback(err, null);
+    if(err) return callback(remapRequestError(err, elapsedMillis));
 
     // request didn't return a response. Sumptin bad happened
     if(!res) return callback(errors.emptyResponse());
