@@ -1096,8 +1096,10 @@ var setRequestAgent = function(opts, agentOptions) {
 var remapRequestError = function(err, elapsedMillis) {
   var status;
   var res;
-  if (err && typeof err === 'object' && err.code === 'ECONNRESET') {
-    err = new NForceError.ApiCallFailure(err.message, err.code, status, getMetaInfo(res, elapsedMillis));
+  if (err && typeof err === 'object') {
+    if (err.code === 'ECONNRESET' || err.code === 'ETIMEDOUT') {
+      err = new NForceError.ApiCallFailure(err.message, err.code, status, getMetaInfo(res, elapsedMillis));
+    }
   }
   return err;
 };
