@@ -767,6 +767,33 @@ Connection.prototype.queryAll = function(query, oauth, callback) {
   return this._queryHandler(query, oauth, true, callback);
 }
 
+Connection.prototype.explain = function(query, oauth, callback) {
+  var uri, opts;
+
+  if(this.mode === 'single') {
+    var args = Array.prototype.slice.call(arguments);
+    oauth = this.oauth;
+    if(args.length == 2) callback = args[1];
+  }
+
+  if(!callback) callback = function(){};
+
+  if(!query || typeof query !== 'string') {
+    return callback(new Error('You must specify a query'));
+  }
+
+  if(!validateOAuth(oauth)) return callback(new Error('Invalid oauth object argument'));
+
+  uri = oauth.instance_url + '/services/data/' + this.apiVersion + '/query';
+  opts = { uri: uri, method: 'GET', qs: { explain: query } }
+
+  return this._apiRequest(opts, oauth, null, function(err, resp, meta){
+    var cbArgs = [err, resp];
+    if (callback.length === 3) cbArgs.push(meta);
+    callback.apply(null, cbArgs);
+  });
+}
+
 Connection.prototype.search = function(search, oauth, callback) {
   var uri, opts;
 
