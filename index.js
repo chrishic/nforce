@@ -1336,6 +1336,10 @@ Connection.prototype._apiRequest = function(opts, oauth, sobject, callback) {
       });
     }
     else {
+      //  If we set encoding = null (for gzip compresssion), `request` returns body as a Buffer, not a string.
+      if (body && Buffer.isBuffer(body)) {
+        body = body.toString();
+      }
       processResponse(body);
     }
 
