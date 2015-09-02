@@ -1140,6 +1140,7 @@ var buildApiCallError = function(res, rawError, elapsedMillis) {
   var message;
   var errorCode;
   var statusCode;
+  var fields;
 
   if (res && typeof res === 'object') {
     statusCode = res.statusCode;
@@ -1148,6 +1149,9 @@ var buildApiCallError = function(res, rawError, elapsedMillis) {
   if (rawError && typeof rawError === 'object') {
     message = rawError.message;
     errorCode = rawError.errorCode;
+    if (rawError.fields && Array.isArray(rawError.fields)) {
+      fields = rawError.fields;
+    }
   }
   else if (rawError && typeof rawError === 'string') {
     message = rawError;
@@ -1155,7 +1159,7 @@ var buildApiCallError = function(res, rawError, elapsedMillis) {
   
   var meta = getMetaInfo(res, elapsedMillis);
 
-  return new NForceError.ApiCallFailure(message, errorCode, statusCode, meta);
+  return new NForceError.ApiCallFailure(message, errorCode, statusCode, fields, meta);
 
 };
 
